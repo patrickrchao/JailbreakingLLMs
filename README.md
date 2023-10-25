@@ -4,14 +4,12 @@
 [![Website](https://img.shields.io/badge/Website-blue)](https://jailbreaking-llms.github.io/)
 [![arXiv](https://img.shields.io/badge/cs.LG-arXiv%3A2310.03957-b31b1b)](https://arxiv.org/abs/2310.08419)
 
-
-
 https://github.com/patrickrchao/JailbreakingLLMs/assets/17835095/d6b68d1a-b16a-4ade-b339-bab9f4a66f69
 
 </div>
 
 ## Abstract
-There is growing interest in ensuring that large language models (LLMs) align with human values. However, the alignment of such models is vulnerable to adversarial jailbreaks, which coax LLMs into overriding their safety guardrails.  The identification of these vulnerabilities is therefore instrumental in understanding inherent weaknesses and preventing future misuse.  To this end, we propose *Prompt Automatic Iterative Refinement* (PAIR), an algorithm that generates semantic jailbreaks with only black-box access to an LLM. PAIR---which is inspired by social engineering attacks---uses an attacker LLM to automatically generate jailbreaks for a separate targeted LLM without human intervention. In this way, the attacker LLM iteratively queries the target LLM to update and refine a candidate jailbreak. Empirically, PAIR often requires fewer than twenty queries to produce a jailbreak, which is orders of magnitude more efficient than existing algorithms. PAIR also achieves competitive jailbreaking success rates and transferability on open and closed-source LLMs, including GPT-3.5/4, Vicuna, and PaLM-2.
+There is growing interest in ensuring that large language models (LLMs) align with human values. However, the alignment of such models is vulnerable to adversarial jailbreaks, which coax LLMs into overriding their safety guardrails.  The identification of these vulnerabilities is therefore instrumental in understanding inherent weaknesses and preventing future misuse.  To this end, we propose *Prompt Automatic Iterative Refinement* (PAIR), an algorithm that generates semantic jailbreaks with only black-box access to an LLM. PAIR—which is inspired by social engineering attacks—uses an attacker LLM to automatically generate jailbreaks for a separate targeted LLM without human intervention. In this way, the attacker LLM iteratively queries the target LLM to update and refine a candidate jailbreak. Empirically, PAIR often requires fewer than twenty queries to produce a jailbreak, which is orders of magnitude more efficient than existing algorithms. PAIR also achieves competitive jailbreaking success rates and transferability on open and closed-source LLMs, including GPT-3.5/4, Vicuna, and PaLM-2.
 
 ## Getting Started
 We provide a Dockerfile in `docker/Dockerfile` that can be used to easily set up the environment needed to run all code in this repository.
@@ -25,8 +23,8 @@ Run `wandb login` to login to your WandB account beforehand to log your data.
 
 If you would like to run PAIR with Vicuna or Llama locally, modify `config.py` with the proper path of Vicuna or Llama.
 
-## Run experiments
-To run PAIR, run
+## Run Experiments
+To run PAIR, run:
 ```
 python3 main.py --attack-model [ATTACK MODEL] --target-model [TARGET MODEL] --judge-model [JUDGE MODEL] --goal [GOAL STRING] --target-str [TARGET STRING]
 ```
