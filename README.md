@@ -1,7 +1,13 @@
 # **Jailbreaking Black Box Large Language Models in Twenty Queries**
-
+<div align="center">
+[![Website](https://img.shields.io/badge/Website-blue
+)]([https://arxiv.org/abs/2310.08419](https://jailbreaking-llms.github.io/))
 [![arXiv](https://img.shields.io/badge/cs.LG-arXiv%3A2310.03957-b31b1b)](https://arxiv.org/abs/2310.08419)
 </div>
+
+
+https://github.com/patrickrchao/JailbreakingLLMs/assets/17835095/d6b68d1a-b16a-4ade-b339-bab9f4a66f69
+
 
 ## Abstract
 There is growing interest in ensuring that large language models (LLMs) align with human values. However, the alignment of such models is vulnerable to adversarial jailbreaks, which coax LLMs into overriding their safety guardrails.  The identification of these vulnerabilities is therefore instrumental in understanding inherent weaknesses and preventing future misuse.  To this end, we propose *Prompt Automatic Iterative Refinement* (PAIR), an algorithm that generates semantic jailbreaks with only black-box access to an LLM. PAIR---which is inspired by social engineering attacks---uses an attacker LLM to automatically generate jailbreaks for a separate targeted LLM without human intervention. In this way, the attacker LLM iteratively queries the target LLM to update and refine a candidate jailbreak. Empirically, PAIR often requires fewer than twenty queries to produce a jailbreak, which is orders of magnitude more efficient than existing algorithms. PAIR also achieves competitive jailbreaking success rates and transferability on open and closed-source LLMs, including GPT-3.5/4, Vicuna, and PaLM-2.
@@ -46,10 +52,10 @@ By default, we use `--n-streams 5` and `--n-iterations 5`, we recommend increasi
 
 See `main.py` for all of the arguments and descriptions.
 
-## Citation
-For any questions, feel free to contact us at `pchao@wharton.upenn.edu`.
 
-```
+## Citation
+Please feel free to email us at `pchao@wharton.upenn.edu`. And if you find this work useful in your own research, please consider citing our work. 
+```bibtex
 @misc{chao2023jailbreaking,
       title={Jailbreaking Black Box Large Language Models in Twenty Queries}, 
       author={Patrick Chao and Alexander Robey and Edgar Dobriban and Hamed Hassani and George J. Pappas and Eric Wong},
@@ -59,3 +65,5 @@ For any questions, feel free to contact us at `pchao@wharton.upenn.edu`.
       primaryClass={cs.LG}
 }
 ```
+### License
+This codebase is released under [MIT License](LICENSE).
