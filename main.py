@@ -182,7 +182,7 @@ if __name__ == '__main__':
     )
     ##################################################
     
-    # TODO: Add a quiet option to supress print statement
+    # TODO: Add a quiet option to suppress print statement
     args = parser.parse_args()
 
     main(args)
