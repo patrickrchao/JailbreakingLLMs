@@ -14,6 +14,11 @@ There is growing interest in ensuring that large language models (LLMs) align wi
 ## Getting Started
 We provide a Dockerfile in `docker/Dockerfile` that can be used to easily set up the environment needed to run all code in this repository.
 
+To build the Docker container, navigate to the root directory of this repository and run the following command:
+```
+docker build -t your-image-tag -f docker/Dockerfile .
+```
+
 For your desired black box models, make sure you have the API key stored in `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `PALM_API_KEY` respectively. For example,
 ```
 export OPENAI_API_KEY=[YOUR_API_KEY_HERE]
