@@ -3,7 +3,7 @@ import argparse
 from loggers import WandBLogger
 from judges import load_judge
 from conversers import load_attack_and_target_models
-from common import process_target_response, get_init_msg, conv_template, set_system_prompts, initialize_conversations
+from common import process_target_response, initialize_conversations
 
 def main(args):
 
@@ -16,7 +16,7 @@ def main(args):
     batchsize = args.n_streams
     # TODO: Modify this
     logger = WandBLogger(args, system_prompts)
-    
+    target_response_list, judge_scores = None, None
     # Begin PAIR
     for iteration in range(1, args.n_iterations + 1):
         print(f"""\n{'='*36}\nIteration: {iteration}\n{'='*36}\n""")
