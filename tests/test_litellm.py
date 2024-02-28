@@ -25,36 +25,27 @@ class TestVicuna(unittest.TestCase):
                                             max_n_tokens = 10, 
                                             temperature = 0,
                                             top_p=0.9)
-        #prompt_tokens = token_counts["prompt_tokens"]
-        #completion_tokens = token_counts["completion_tokens"]  
         self.assertEqual(len(responses), num_convs)
         self.assertEqual(responses,correct_responses)
-        #self.assertEqual(prompt_tokens, [38, 38])
-        #self.assertEqual(completion_tokens, [9,7 ])
 
     def test_initialized_response(self):
-        # If we have an assistant as the second response, then we need to add a brace to the end of the response
-        # This is to ensure the JSON output is properly formatted
         convs_list = [
-                        [{"role": "user", "content": "What is the meaning of life?",
-                        "role": "assistant", "content": "I don't know, instead, let's count to 10: 1,2,"}],
-                        [{"role": "user", "content": "Write a poem about skateboarding in the ocean.",
-                        "role": "assistant", "content": "I'm bad at writing poems, but here goes: It was a dark and stormy night."}]
+                        [{"role": "user", "content": "What is the meaning of life?"},
+                        {"role": "assistant", "content": "I don't know, instead, let's count to 10: 1,2,"}],
+                        [{"role": "user", "content": "Write a poem about skateboarding in the ocean."},
+                         {"role": "assistant", "content": "I'm bad at writing poems, but here goes: It was a dark and stormy night."}]
                     ]
         correct_responses = [
                              "3,4,5,6,7,",
-                             "The kind of night where you just want to curl"] 
+                             "The waves were crashing, the wind was how"] 
         num_convs = len(convs_list)
         responses = self.lm.batched_generate(convs_list, 
                                                 max_n_tokens = 10, 
                                                 temperature = 0,
                                                 top_p=0.9)
-        #prompt_tokens = token_counts["prompt_tokens"]
-        #completion_tokens = token_counts["completion_tokens"]  
         self.assertEqual(len(responses), num_convs)
         self.assertEqual(responses,correct_responses)
-        #self.assertEqual(prompt_tokens, [19, 20])
-        #self.assertEqual(completion_tokens, [10, 10])
+
 
 
 
