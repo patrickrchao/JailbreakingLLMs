@@ -8,7 +8,7 @@ import pandas as pd
 class WandBLogger:
     """WandB logger."""
 
-    def __init__(self, args, system_prompt):
+    def __init__(self, args, system_prompts):
         self.logger = wandb.init(
             project = "jailbreak-llms",
             config = {
@@ -16,14 +16,13 @@ class WandBLogger:
                 "target_model" : args.target_model,
                 "judge_model": args.judge_model,
                 "keep_last_n": args.keep_last_n,
-                "system_prompt": system_prompt,
+                "system_prompt": system_prompts,
                 "index": args.index,
                 "category": args.category,
                 "goal": args.goal,
                 "n_iter": args.n_iterations,
                 "target_str": args.target_str,
                 "n_streams": args.n_streams,
-
             }
         )
         self.is_jailbroken = False
@@ -124,7 +123,7 @@ class WandBLogger:
 
 #     def write(self, conv):
 
-#         with open(self.filename, 'w', encoding='utf-8') as f:
+#         with open(self.filename, 'w', encoding='utf-8') as f:q
 #             f.write(f"""
 #                 Attack model: {self.args.attack_model_path}
 #                 Target model: {self.args.target_model_path}\n

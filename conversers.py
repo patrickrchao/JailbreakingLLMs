@@ -1,29 +1,43 @@
-
 import common
-from language_models import GPT, Claude, PaLM, HuggingFace
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from config import VICUNA_PATH, LLAMA_PATH, ATTACK_TEMP, TARGET_TEMP, ATTACK_TOP_P, TARGET_TOP_P   
+from language_models import APILiteLLM
+import os 
+
+from config import FASTCHAT_TEMPLATE_NAMES, Model
+
+from jailbreakbench import Classifier
 
 def load_attack_and_target_models(args):
-    # Load attack model and tokenizer
+    # create attack model and target model
     attackLM = AttackLM(model_name = args.attack_model, 
                         max_n_tokens = args.attack_max_n_tokens, 
                         max_n_attack_attempts = args.max_n_attack_attempts, 
-                        temperature = ATTACK_TEMP, # init to 1
-                        top_p = ATTACK_TOP_P, # init to 0.9
+                        category = args.category,
+                        evaluate_locally = args.evaluate_locally
                         )
-    preloaded_model = None
-    if args.attack_model == args.target_model:
-        print("Using same attack and target model. Using previously loaded model.")
-        preloaded_model = attackLM.model
-    targetLM = TargetLM(model_name = args.target_model, 
+    
+    targetLM = TargetLM(model_name = args.target_model,
+                        category = args.category,
                         max_n_tokens = args.target_max_n_tokens,
-                        temperature = TARGET_TEMP, # init to 0
-                        top_p = TARGET_TOP_P, # init to 1
-                        preloaded_model = preloaded_model,
+                        evaluate_locally = args.evaluate_locally,
+                        phase = args.jailbreakbench_phase
                         )
+    
     return attackLM, targetLM
+
+def load_indiv_model(model_name, local = False, use_jailbreakbench=True):
+    if use_jailbreakbench: 
+        if local:
+            from jailbreakbench import LLMvLLM
+            lm = LLMvLLM(model_name=model_name)
+        else:
+            from jailbreakbench import LLMTogether
+            lm = LLMTogether(model_name= model_name, together_api_key = os.environ["TOGETHERAI_API_KEY"])
+    else:
+        if local:
+            raise NotImplementedError
+        else:
+            lm = APILiteLLM(model_name)
+    return lm
 
 class AttackLM():
     """
@@ -35,18 +49,82 @@ class AttackLM():
                 model_name: str, 
                 max_n_tokens: int, 
                 max_n_attack_attempts: int, 
-                temperature: float,
-                top_p: float):
+                category: str,
+                evaluate_locally: bool):
         
-        self.model_name = model_name
-        self.temperature = temperature
+        self.model_name = Model(model_name)
         self.max_n_tokens = max_n_tokens
         self.max_n_attack_attempts = max_n_attack_attempts
-        self.top_p = top_p
-        self.model, self.template = load_indiv_model(model_name)
+
+        from config import ATTACK_TEMP, ATTACK_TOP_P
+        self.temperature = ATTACK_TEMP
+        self.top_p = ATTACK_TOP_P
+
+        self.category = category
+        self.evaluate_locally = evaluate_locally
+        self.model = load_indiv_model(model_name, 
+                                      local = evaluate_locally, 
+                                      use_jailbreakbench=False # Cannot use JBB as attacker
+                                      )
+        self.initialize_output = self.model.use_open_source_model
+        self.template = FASTCHAT_TEMPLATE_NAMES[self.model_name]
+
+    def preprocess_conversation(self, convs_list: list, prompts_list: list[str]):
+        # For open source models, we can seed the generation with proper JSON
+        init_message = ""
+        if self.initialize_output:
+            
+            # Initalize the attack model's generated output to match format
+            if len(convs_list[0].messages) == 0:# If is first message, don't need improvement
+                init_message = '{"improvement": "","prompt": "'
+            else:
+                init_message = '{"improvement": "'
+        for conv, prompt in zip(convs_list, prompts_list):
+            conv.append_message(conv.roles[0], prompt)
+            if self.initialize_output:
+                conv.append_message(conv.roles[1], init_message)
+        openai_convs_list = [conv.to_openai_api_messages() for conv in convs_list]
+        return openai_convs_list, init_message
         
-        if "vicuna" in model_name or "llama" in model_name:
-            self.model.extend_eos_tokens()
+    def _generate_attack(self, openai_conv_list: list[list[dict]], init_message: str):
+        batchsize = len(openai_conv_list)
+        indices_to_regenerate = list(range(batchsize))
+        valid_outputs = [None] * batchsize
+        new_adv_prompts = [None] * batchsize
+        
+        # Continuously generate outputs until all are valid or max_n_attack_attempts is reached
+        for attempt in range(self.max_n_attack_attempts):
+            # Subset conversations based on indices to regenerate
+            convs_subset = [openai_conv_list[i] for i in indices_to_regenerate]
+            # Generate outputs 
+            outputs_list = self.model.batched_generate(convs_subset,
+                                                        max_n_tokens = self.max_n_tokens,  
+                                                        temperature = self.temperature,
+                                                        top_p = self.top_p,
+                                                        extra_eos_tokens=["}"]
+                                                    )
+            
+            # Check for valid outputs and update the list
+            new_indices_to_regenerate = []
+            for i, full_output in enumerate(outputs_list):
+                orig_index = indices_to_regenerate[i]
+                full_output = init_message + full_output + "}" # Add end brace since we terminate generation on end braces
+                attack_dict, json_str = common.extract_json(full_output)
+                if attack_dict is not None:
+                    valid_outputs[orig_index] = attack_dict
+                    new_adv_prompts[orig_index] = json_str
+                else:
+                    new_indices_to_regenerate.append(orig_index)
+            
+            # Update indices to regenerate for the next iteration
+            indices_to_regenerate = new_indices_to_regenerate
+            # If all outputs are valid, break
+            if not indices_to_regenerate:
+                break
+
+        if any([output is None for output in valid_outputs]):
+            raise ValueError(f"Failed to generate valid output after {self.max_n_attack_attempts} attempts. Terminating.")
+        return valid_outputs, new_adv_prompts
 
     def get_attack(self, convs_list, prompts_list):
         """
@@ -61,180 +139,66 @@ class AttackLM():
         Returns:
         - List of generated outputs (dictionaries) or None for failed generations.
         """
-        
         assert len(convs_list) == len(prompts_list), "Mismatch between number of conversations and prompts."
         
-        batchsize = len(convs_list)
-        indices_to_regenerate = list(range(batchsize))
-        valid_outputs = [None] * batchsize
+        # Convert conv_list to openai format and add the initial message
+        processed_convs_list, init_message = self.preprocess_conversation(convs_list, prompts_list)
+        valid_outputs, new_adv_prompts = self._generate_attack(processed_convs_list, init_message)
 
-        # Initalize the attack model's generated output to match format
-        if len(convs_list[0].messages) == 0:
-            init_message = """{\"improvement\": \"\",\"prompt\": \""""
-        else:
-            init_message = """{\"improvement\": \"""" 
-
-        full_prompts = []
-        # Add prompts and initial seeding messages to conversations (only once)
-        for conv, prompt in zip(convs_list, prompts_list):
-            conv.append_message(conv.roles[0], prompt)
-            # Get prompts
-            if "gpt" in self.model_name:
-                full_prompts.append(conv.to_openai_api_messages())
-            else:
-                conv.append_message(conv.roles[1], init_message)
-                full_prompts.append(conv.get_prompt()[:-len(conv.sep2)])
-            
-        for attempt in range(self.max_n_attack_attempts):
-            # Subset conversations based on indices to regenerate
-            full_prompts_subset = [full_prompts[i] for i in indices_to_regenerate]
-
-            # Generate outputs 
-            outputs_list = self.model.batched_generate(full_prompts_subset,
-                                                        max_n_tokens = self.max_n_tokens,  
-                                                        temperature = self.temperature,
-                                                        top_p = self.top_p
-                                                    )
-            
-            # Check for valid outputs and update the list
-            new_indices_to_regenerate = []
-            for i, full_output in enumerate(outputs_list):
-                orig_index = indices_to_regenerate[i]
-                if "gpt" not in self.model_name:
-                    full_output = init_message + full_output
-
-                attack_dict, json_str = common.extract_json(full_output)
-                
-                if attack_dict is not None:
-                    valid_outputs[orig_index] = attack_dict
-                    convs_list[orig_index].update_last_message(json_str)  # Update the conversation with valid generation
-                else:
-                    new_indices_to_regenerate.append(orig_index)
-            
-            # Update indices to regenerate for the next iteration
-            indices_to_regenerate = new_indices_to_regenerate
-            
-            # If all outputs are valid, break
-            if not indices_to_regenerate:
-                break
+        for jailbreak_prompt, conv in zip(new_adv_prompts, convs_list):
+            # For open source models, we can seed the generation with proper JSON and omit the post message
+            # We add it back here
+            if self.initialize_output:
+                jailbreak_prompt += self.model.post_message
+            conv.update_last_message(jailbreak_prompt)
         
-        if any([output for output in valid_outputs if output is None]):
-            print(f"Failed to generate output after {self.max_n_attack_attempts} attempts. Terminating.")
         return valid_outputs
 
 class TargetLM():
     """
-        Base class for target language models.
-        
-        Generates responses for prompts using a language model. The self.model attribute contains the underlying generation model.
+        JailbreakBench class for target language models.
     """
     def __init__(self, 
             model_name: str, 
-            max_n_tokens: int, 
-            temperature: float,
-            top_p: float,
-            preloaded_model: object = None):
+            category: str,
+            max_n_tokens : int,
+            phase: str,
+            evaluate_locally: bool = False,
+            use_jailbreakbench: bool = True,
+            ):
         
         self.model_name = model_name
-        self.temperature = temperature
         self.max_n_tokens = max_n_tokens
-        self.top_p = top_p
-        if preloaded_model is None:
-            self.model, self.template = load_indiv_model(model_name)
-        else:
-            self.model = preloaded_model
-            _, self.template = get_model_path_and_template(model_name)
+        self.phase = phase
+        self.use_jailbreakbench = use_jailbreakbench
+        self.evaluate_locally = evaluate_locally
+
+        from config import TARGET_TEMP,  TARGET_TOP_P   
+        self.temperature = TARGET_TEMP
+        self.top_p = TARGET_TOP_P
+
+        self.model = load_indiv_model(model_name, evaluate_locally, use_jailbreakbench)            
+        self.category = category
 
     def get_response(self, prompts_list):
-        batchsize = len(prompts_list)
-        convs_list = [common.conv_template(self.template) for _ in range(batchsize)]
-        full_prompts = []
-        for conv, prompt in zip(convs_list, prompts_list):
-            conv.append_message(conv.roles[0], prompt)
-            if "gpt" in self.model_name:
-                # Openai does not have separators
+        if self.use_jailbreakbench:
+            llm_response = self.model.query(prompts = prompts_list, 
+                                behavior = self.category, 
+                                phase = self.phase,
+                                max_new_tokens=self.max_n_tokens)
+            responses = llm_response.responses
+        else:
+            batchsize = len(prompts_list)
+            convs_list = [common.conv_template(self.template) for _ in range(batchsize)]
+            full_prompts = []
+            for conv, prompt in zip(convs_list, prompts_list):
+                conv.append_message(conv.roles[0], prompt)
                 full_prompts.append(conv.to_openai_api_messages())
-            elif "palm" in self.model_name:
-                full_prompts.append(conv.messages[-1][1])
-            else:
-                conv.append_message(conv.roles[1], None) 
-                full_prompts.append(conv.get_prompt())
-        
-        outputs_list = self.model.batched_generate(full_prompts, 
-                                                        max_n_tokens = self.max_n_tokens,  
-                                                        temperature = self.temperature,
-                                                        top_p = self.top_p
-                                                    )
-        return outputs_list
 
-
-
-def load_indiv_model(model_name, device=None):
-    model_path, template = get_model_path_and_template(model_name)
-    if model_name in ["gpt-3.5-turbo", "gpt-4"]:
-        lm = GPT(model_name)
-    elif model_name in ["claude-2", "claude-instant-1"]:
-        lm = Claude(model_name)
-    elif model_name in ["palm-2"]:
-        lm = PaLM(model_name)
-    else:
-        model = AutoModelForCausalLM.from_pretrained(
-                model_path, 
-                torch_dtype=torch.float16,
-                low_cpu_mem_usage=True,device_map="auto").eval()
-
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_path,
-            use_fast=False
-        ) 
-
-        if 'llama-2' in model_path.lower():
-            tokenizer.pad_token = tokenizer.unk_token
-            tokenizer.padding_side = 'left'
-        if 'vicuna' in model_path.lower():
-            tokenizer.pad_token = tokenizer.eos_token
-            tokenizer.padding_side = 'left'
-        if not tokenizer.pad_token:
-            tokenizer.pad_token = tokenizer.eos_token
-
-        lm = HuggingFace(model_name, model, tokenizer)
-    
-    return lm, template
-
-def get_model_path_and_template(model_name):
-    full_model_dict={
-        "gpt-4":{
-            "path":"gpt-4",
-            "template":"gpt-4"
-        },
-        "gpt-3.5-turbo": {
-            "path":"gpt-3.5-turbo",
-            "template":"gpt-3.5-turbo"
-        },
-        "vicuna":{
-            "path":VICUNA_PATH,
-            "template":"vicuna_v1.1"
-        },
-        "llama-2":{
-            "path":LLAMA_PATH,
-            "template":"llama-2"
-        },
-        "claude-instant-1":{
-            "path":"claude-instant-1",
-            "template":"claude-instant-1"
-        },
-        "claude-2":{
-            "path":"claude-2",
-            "template":"claude-2"
-        },
-        "palm-2":{
-            "path":"palm-2",
-            "template":"palm-2"
-        }
-    }
-    path, template = full_model_dict[model_name]["path"], full_model_dict[model_name]["template"]
-    return path, template
-
-
-
-    
+            responses = self.model.batched_generate(full_prompts, 
+                                                            max_n_tokens = self.max_n_tokens,  
+                                                            temperature = self.temperature,
+                                                            top_p = self.top_p
+                                                        )
+           
+        return responses
