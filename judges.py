@@ -4,6 +4,7 @@ from fastchat.model import (
 import re
 from system_prompts import get_judge_system_prompt
 from language_models import APILiteLLM
+from loggers import logger
 
 from jailbreakbench import Classifier
 import os
@@ -40,7 +41,7 @@ class JudgeBase:
         match = re.search(pattern, raw_output)
         output = int(match.group(1)) if match else None
         if output is None:
-            print(f"Error in processing judge output: {raw_output}" )
+            logger.warning(f"Error in processing judge output: {raw_output}" )
             output = 1
         return output
                
@@ -73,7 +74,6 @@ class GPTJudge(JudgeBase):
     
 class JBBJudge(JudgeBase):
     def __init__(self,classifier_path):
-        
         self.judge_model = Classifier(classifier_path)
         self.judge_name = "JBBJudge"
 

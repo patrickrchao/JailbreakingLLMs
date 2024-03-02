@@ -1,5 +1,5 @@
 import ast
-import logging
+from loggers import logger
 from fastchat.model import get_conversation_template
 from system_prompts import get_attacker_system_prompts
 
@@ -19,8 +19,8 @@ def extract_json(s):
     start_pos = s.find("{") 
     end_pos = s.find("}") + 1  # +1 to include the closing brace
     if end_pos == -1:
-        logging.error("Error extracting potential JSON structure")
-        logging.error(f"Input:\n {s}")
+        logger.error("Error extracting potential JSON structure")
+        logger.error(f"Input:\n {s}")
         return None, None
 
     json_str = s[start_pos:end_pos]
@@ -29,13 +29,13 @@ def extract_json(s):
     try:
         parsed = ast.literal_eval(json_str)
         if not all(x in parsed for x in ["improvement","prompt"]):
-            logging.error("Error in extracted structure. Missing keys.")
-            logging.error(f"Extracted:\n {json_str}")
+            logger.error("Error in extracted structure. Missing keys.")
+            logger.error(f"Extracted:\n {json_str}")
             return None, None
         return parsed, json_str
     except (SyntaxError, ValueError):
-        logging.error("Error parsing extracted structure")
-        logging.error(f"Extracted:\n {json_str}")
+        logger.error("Error parsing extracted structure")
+        logger.error(f"Extracted:\n {json_str}")
         return None, None
 
 def get_init_msg(goal, target):
@@ -58,7 +58,7 @@ def set_system_prompts(system_prompts, convs_list):
     num_system_prompts = len(system_prompts)
     num_convs = len(convs_list)
     if num_convs % num_system_prompts != 0:
-        print("Warning: Number of system prompts does not divide the number of conversations evenly.")
+        logger.warning("Warning: Number of system prompts does not divide the number of conversations evenly.")
     for i,conv in enumerate(convs_list):
         conv.set_system_message(system_prompts[i%num_system_prompts])
         

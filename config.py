@@ -42,6 +42,7 @@ FASTCHAT_TEMPLATE_NAMES: dict[Model, str] = {
     Model.gemini: "gemini-pro",
     Model.vicuna: "vicuna_v1.1",
     Model.llama_2: "llama-2",
+    Model.mixtral: "mixtral",
 }
 
 API_KEY_NAMES: dict[Model, str] = {
@@ -50,8 +51,9 @@ API_KEY_NAMES: dict[Model, str] = {
     Model.claude_1: "ANTHROPIC_API_KEY",
     Model.claude_2: "ANTHROPIC_API_KEY",
     Model.gemini:   "GEMINI_API_KEY",
-    Model.vicuna:   "TOGETHERAI_API_KEY",
-    Model.llama_2:  "TOGETHERAI_API_KEY",
+    Model.vicuna:   "TOGETHER_API_KEY",
+    Model.llama_2:  "TOGETHER_API_KEY",
+    Model.mixtral:  "TOGETHER_API_KEY",
 }
 
 LITELLM_TEMPLATES: dict[Model, dict] = {
