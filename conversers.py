@@ -4,7 +4,6 @@ import os
 
 from config import FASTCHAT_TEMPLATE_NAMES, Model
 
-from jailbreakbench import Classifier
 
 def load_attack_and_target_models(args):
     # create attack model and target model
@@ -31,7 +30,7 @@ def load_indiv_model(model_name, local = False, use_jailbreakbench=True):
             lm = LLMvLLM(model_name=model_name)
         else:
             from jailbreakbench import LLMTogether
-            lm = LLMTogether(model_name= model_name, together_api_key = os.environ["TOGETHERAI_API_KEY"])
+            lm = LLMTogether(model_name= model_name, together_api_key = os.environ["TOGETHER_API_KEY"])
     else:
         if local:
             raise NotImplementedError

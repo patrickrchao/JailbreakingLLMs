@@ -1,9 +1,28 @@
-import os
 import wandb
-import pytz
-from datetime import datetime
 import pandas as pd
+import logging 
 
+def setup_logger():
+    logger = logging.getLogger('PAIR')
+    handler = logging.StreamHandler()
+    logger.addHandler(handler)
+
+    return logger
+
+def set_logger_level(logger, verbosity):
+    if verbosity == 0:
+        level=logging.CRITICAL # Disables logging
+    elif verbosity == 1:
+        level = level=logging.INFO
+    else:
+        level = logging.DEBUG
+    logger.setLevel(level)
+    for handler in logger.handlers:
+        handler.setLevel(level)
+    
+
+logger = setup_logger()
+logger.set_level = lambda verbosity : set_logger_level(logger, verbosity)
 
 class WandBLogger:
     """WandB logger."""
@@ -82,62 +101,24 @@ class WandBLogger:
 
         num_new_jailbreaks = len([cn for cn in jailbreaks_at_iter if cn not in prev_jailbreaks])
 
-        print(f"{'='*14} SUMMARY STATISTICS {'='*14}")
-        print(f"Mean/Max Score for iteration: {mean_score_for_iter:.1f}, {max_score_for_iter}")
-        print(f"Number of New Jailbreaks: {num_new_jailbreaks}/{bs}")
-        print(f"Total Number of Conv. Jailbroken: {num_total_jailbreaks}/{bs} ({num_total_jailbreaks/bs*100:2.1f}%)\n")
+        logger.info(f"{'='*14} SUMMARY STATISTICS for Iteration {iter} {'='*14}")
+        logger.info(f"Mean/Max Score for iteration: {mean_score_for_iter:.1f}, {max_score_for_iter}")
+        logger.info(f"Number of New Jailbreaks: {num_new_jailbreaks}/{bs}")
+        logger.info(f"Total Number of Conv. Jailbroken: {num_total_jailbreaks}/{bs} ({num_total_jailbreaks/bs*100:2.1f}%)\n")
 
     def print_final_summary_stats(self):
-        print(f"{'='*8} FINAL SUMMARY STATISTICS {'='*8}")
-        print(f"Index: {self.index}")
-        print(f"Goal: {self.goal}")
+        logger.info(f"{'='*8} FINAL SUMMARY STATISTICS {'='*8}")
+        logger.info(f"Index: {self.index}")
+        logger.info(f"Goal: {self.goal}")
         df = self.table
         if self.is_jailbroken:
             num_total_jailbreaks = df[df['judge_scores'] == 10]['conv_num'].nunique()
-            print(f"First Jailbreak: {self.query_to_jailbreak} Queries")
-            print(f"Total Number of Conv. Jailbroken: {num_total_jailbreaks}/{self.batch_size} ({num_total_jailbreaks/self.batch_size*100:2.1f}%)")
-            print(f"Example Jailbreak PROMPT:\n\n{self.jailbreak_prompt}\n\n")
-            print(f"Example Jailbreak RESPONSE:\n\n{self.jailbreak_response}\n\n\n")
-            
+            logger.info(f"First Jailbreak: {self.query_to_jailbreak} Queries")
+            logger.info(f"Total Number of Conv. Jailbroken: {num_total_jailbreaks}/{self.batch_size} ({num_total_jailbreaks/self.batch_size*100:2.1f}%)")
+            logger.info(f"Example Jailbreak PROMPT:\n\n{self.jailbreak_prompt}\n\n")
+            logger.info(f"Example Jailbreak RESPONSE:\n\n{self.jailbreak_response}\n\n\n")
         else:
-            print("No jailbreaks achieved.")
+            logger.info("No jailbreaks achieved.")
             max_score = df['judge_scores'].max()
-            print(f"Max Score: {max_score}")
-
-
-    
-
-# class Saver:
-#     """Saves the conversation."""
-
-#     def __init__(self, args, system_prompt):
-#         self.args = args
-#         self.system_prompt = system_prompt
-
-#         now = datetime.now(pytz.timezone('US/Eastern'))
-#         self.filename = os.path.join(
-#             "outputs",
-#             f"{args.behavior}",
-#             f"output_date_{now.month}_{now.day}_time_{now.hour}_{now.minute}.txt"
-#         )
-
-#     def write(self, conv):
-
-#         with open(self.filename, 'w', encoding='utf-8') as f:q
-#             f.write(f"""
-#                 Attack model: {self.args.attack_model_path}
-#                 Target model: {self.args.target_model_path}\n
-#                 System prompt: \n\n{self.system_prompt}\n\n"""
-#             )
-
-#             for counter, (role, s) in enumerate(conv.messages):
-#                 if counter % 2 == 1:
-#                     f.write(f"""\n{'='*36}
-#                         Iteration: {(counter + 1) // 2}
-#                         {'='*36}\n
-#                         User:\n {s}\n"""
-#                     )
-#                 else:
-#                     f.write(f"Assistant:\n {s}\n")
-
+            logger.info(f"Max Score: {max_score}")
 
