@@ -43,6 +43,9 @@ See `main.py` for all of the arguments and descriptions.
 ### AdvBench Behaviors Custom Subset
 For our experiments, we use a custom subset of 50 harmful behaviors from the [AdvBench Dataset](https://github.com/llm-attacks/llm-attacks/tree/main/data/advbench) located in `data/harmful_behaviors_custom.csv`.
 
+## JailbreakBench
+For the experiments in the updated version of our paper, we use the evaluation framework from [JailbreakBench](https://arxiv.org/abs/2404.01318). Check out `main.py` for descriptions on the arguments on how to run the JailbreakBench evaluations.
+
 ## Citation
 Please feel free to email us at `pchao@wharton.upenn.edu`. If you find this work useful in your own research, please consider citing our work. 
 ```bibtex

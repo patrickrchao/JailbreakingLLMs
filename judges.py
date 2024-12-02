@@ -68,7 +68,8 @@ class GPTJudge(JudgeBase):
         convs_list = [self.create_conv(self.get_judge_prompt(prompt, response)) for prompt, response in zip(attack_prompt_list, target_response_list)]
         raw_outputs = self.judge_model.batched_generate(convs_list, 
                                                         max_n_tokens = self.max_n_tokens,
-                                                        temperature = self.temperature)
+                                                        temperature = self.temperature,
+                                                        top_p=1)
         outputs = [self.process_output(raw_output) for raw_output in raw_outputs]
         return outputs
     
