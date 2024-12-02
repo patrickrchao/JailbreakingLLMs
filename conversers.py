@@ -1,7 +1,5 @@
-import common
+from common import get_api_key, conv_template, extract_json
 from language_models import APILiteLLM
-import os 
-
 from config import FASTCHAT_TEMPLATE_NAMES, Model
 
 
@@ -29,8 +27,9 @@ def load_indiv_model(model_name, local = False, use_jailbreakbench=True):
             from jailbreakbench import LLMvLLM
             lm = LLMvLLM(model_name=model_name)
         else:
-            from jailbreakbench import LLMTogether
-            lm = LLMTogether(model_name= model_name, together_api_key = os.environ["TOGETHER_API_KEY"])
+            from jailbreakbench import LLMLiteLLM
+            api_key = get_api_key(Model(model_name))
+            lm = LLMLiteLLM(model_name= model_name, api_key = api_key)
     else:
         if local:
             raise NotImplementedError
@@ -108,7 +107,7 @@ class AttackLM():
             for i, full_output in enumerate(outputs_list):
                 orig_index = indices_to_regenerate[i]
                 full_output = init_message + full_output + "}" # Add end brace since we terminate generation on end braces
-                attack_dict, json_str = common.extract_json(full_output)
+                attack_dict, json_str = extract_json(full_output)
                 if attack_dict is not None:
                     valid_outputs[orig_index] = attack_dict
                     new_adv_prompts[orig_index] = json_str
@@ -188,7 +187,7 @@ class TargetLM():
             responses = llm_response.responses
         else:
             batchsize = len(prompts_list)
-            convs_list = [common.conv_template(self.template) for _ in range(batchsize)]
+            convs_list = [conv_template(self.template) for _ in range(batchsize)]
             full_prompts = []
             for conv, prompt in zip(convs_list, prompts_list):
                 conv.append_message(conv.roles[0], prompt)
