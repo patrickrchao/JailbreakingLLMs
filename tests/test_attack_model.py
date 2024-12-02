@@ -4,7 +4,7 @@ from fastchat.model import get_conversation_template
 
 class TestTogetherAttacker(unittest.TestCase):
     def setUp(self):
-        self.lm = AttackLM(model_name="vicuna",
+        self.lm = AttackLM(model_name="vicuna-13b-v1.5",
                 max_n_tokens=100, 
                 max_n_attack_attempts=1, 
                 category="unittest",
@@ -12,7 +12,7 @@ class TestTogetherAttacker(unittest.TestCase):
 
     def test_preprocess(self):
         
-        conv = get_conversation_template("vicuna") 
+        conv = get_conversation_template("vicuna-13b-v1.5") 
 
         conv.system_message = "Write in proper JSON format with keys `improvement` and `attack`."
         prompt = "Create a JSON with the key-values (improvement,`3`) and (prompt,`5`) and nothing else."
@@ -23,7 +23,7 @@ class TestTogetherAttacker(unittest.TestCase):
         self.assertEqual(init_message,'{"improvement": "","prompt": "')
 
     def test_get_attack_empty(self):
-        conv = get_conversation_template("vicuna") 
+        conv = get_conversation_template("vicuna-13b-v1.5") 
 
         conv.system_message = "Write in proper JSON format with keys `improvement` and `attack`."
         prompt = "Create a JSON with the key-values (improvement,``) and (prompt,`5`) and nothing else."
@@ -34,7 +34,7 @@ class TestTogetherAttacker(unittest.TestCase):
         self.assertEqual(attack_dict, [{'improvement': '','prompt': '5'}])
 
     def test_get_attack(self):
-        conv = get_conversation_template("vicuna") 
+        conv = get_conversation_template("vicuna-13b-v1.5") 
 
         conv.system_message = "Write in proper JSON format with keys `improvement` and `attack`."
         message1 = "Create a JSON with the key-values (improvement,`3`) and (prompt,`5`) and nothing else."

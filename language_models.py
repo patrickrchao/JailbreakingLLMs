@@ -2,6 +2,7 @@ import os
 import litellm
 from config import TOGETHER_MODEL_NAMES, LITELLM_TEMPLATES, API_KEY_NAMES, Model
 from loggers import logger
+from common import get_api_key
 
 class LanguageModel():
     def __init__(self, model_name):
@@ -22,7 +23,7 @@ class APILiteLLM(LanguageModel):
 
     def __init__(self, model_name):
         super().__init__(model_name)
-        self.api_key = self.get_api_key(self.model_name)
+        self.api_key = get_api_key(self.model_name)
         self.litellm_model_name = self.get_litellm_model_name(self.model_name)
         litellm.drop_params=True
         self.set_eos_tokens(self.model_name)
@@ -32,17 +33,18 @@ class APILiteLLM(LanguageModel):
             litellm_name = TOGETHER_MODEL_NAMES[model_name]
             self.use_open_source_model = True
         else:
-            if self.use_open_source_model:
+            self.use_open_source_model =  False
+            #if self.use_open_source_model:
                 # Output warning, there should be a TogetherAI model name
-                logger.warning(f"Warning: No TogetherAI model name for {model_name}.")
-            litellm_name = model_name
+                #logger.warning(f"Warning: No TogetherAI model name for {model_name}.")
+            litellm_name = model_name.value 
         return litellm_name
     
     def set_eos_tokens(self, model_name):
         if self.use_open_source_model:
             self.eos_tokens = LITELLM_TEMPLATES[model_name]["eos_tokens"]     
         else:
-            self.eos_tokens = None
+            self.eos_tokens = []
 
     def _update_prompt_template(self):
         # We manually add the post_message later if we want to seed the model response
@@ -56,13 +58,7 @@ class APILiteLLM(LanguageModel):
         else:
             self.post_message = ""
         
-    def get_api_key(self, model_name):
-        self.use_open_source_model = False
-        environ_var = API_KEY_NAMES[model_name]
-        try:
-            return os.environ[environ_var]  
-        except KeyError:
-            logger.error(f"Missing API key, for {model_name}, please enter your API key by running: export {environ_var}='your-api-key-here'")
+    
     
     def batched_generate(self, convs_list: list[list[dict]], 
                          max_n_tokens: int, 
@@ -92,3 +88,56 @@ class APILiteLLM(LanguageModel):
         responses = [output["choices"][0]["message"].content for output in outputs]
 
         return responses
+
+# class LocalvLLM(LanguageModel):
+    
+#     def __init__(self, model_name: str):
+#         """Initializes the LLMHuggingFace with the specified model name."""
+#         super().__init__(model_name)
+#         if self.model_name not in MODEL_NAMES:
+#             raise ValueError(f"Invalid model name: {model_name}")
+#         self.hf_model_name = HF_MODEL_NAMES[Model(model_name)]
+#         destroy_model_parallel()
+#         self.model = vllm.LLM(model=self.hf_model_name)
+#         if self.temperature > 0:
+#             self.sampling_params = vllm.SamplingParams(
+#                 temperature=self.temperature, top_p=self.top_p, max_tokens=self.max_n_tokens
+#             )
+#         else:
+#             self.sampling_params = vllm.SamplingParams(temperature=0, max_tokens=self.max_n_tokens)
+
+#     def _get_responses(self, prompts_list: list[str], max_new_tokens: int | None = None) -> list[str]:
+#         """Generates responses from the model for the given prompts."""
+#         full_prompt_list = self._prompt_to_conv(prompts_list)
+#         outputs = self.model.generate(full_prompt_list, self.sampling_params)
+#         # Get output from each input, but remove initial space
+#         outputs_list = [output.outputs[0].text[1:] for output in outputs]
+#         return outputs_list
+
+#     def _prompt_to_conv(self, prompts_list):
+#         batchsize = len(prompts_list)
+#         convs_list = [self._init_conv_template() for _ in range(batchsize)]
+#         full_prompts = []
+#         for conv, prompt in zip(convs_list, prompts_list):
+#             conv.append_message(conv.roles[0], prompt)
+#             conv.append_message(conv.roles[1], None)
+#             full_prompt = conv.get_prompt()
+#             # Need this to avoid extraneous space in generation
+#             if "llama-2-7b-chat-hf" in self.model_name:
+#                 full_prompt += " "
+#             full_prompts.append(full_prompt)
+#         return full_prompts
+
+#     def _init_conv_template(self):
+#         template = get_conversation_template(self.hf_model_name)
+#         if "llama" in self.hf_model_name:
+#             # Add the system prompt for Llama as FastChat does not include it
+#             template.system_message = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.\n\nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
+#         return template
+    
+
+
+
+
+
+

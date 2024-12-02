@@ -3,7 +3,7 @@ from language_models import APILiteLLM
 
 class TestVicuna(unittest.TestCase):
     def setUp(self):
-        self.lm = APILiteLLM("vicuna")
+        self.lm = APILiteLLM("vicuna-13b-v1.5")
 
     def test_get_response(self):
         convs_list = [

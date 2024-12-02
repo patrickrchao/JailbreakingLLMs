@@ -10,8 +10,8 @@ TARGET_TOP_P = 1
 
 ## MODEL PARAMETERS ##
 class Model(Enum):
-    vicuna = "vicuna"
-    llama_2 = "llama-2"
+    vicuna = "vicuna-13b-v1.5"
+    llama_2 = "llama-2-7b-chat-hf"
     gpt_3_5 = "gpt-3.5-turbo-1106"
     gpt_4 = "gpt-4-0125-preview"
     claude_1 = "claude-instant-1.2"
@@ -41,7 +41,7 @@ FASTCHAT_TEMPLATE_NAMES: dict[Model, str] = {
     Model.claude_2: "claude-2.1",
     Model.gemini: "gemini-pro",
     Model.vicuna: "vicuna_v1.1",
-    Model.llama_2: "llama-2",
+    Model.llama_2: "llama-2-7b-chat-hf",
     Model.mixtral: "mixtral",
 }
 
