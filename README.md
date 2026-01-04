@@ -1,4 +1,5 @@
-# **Jailbreaking Black Box Large Language Models in Twenty Queries**
+#sudo su   
+**Jailbreaking Black Box Large Language Models in Twenty Queries**
 <div align="center">
 
 [![Website](https://img.shields.io/badge/Website-blue)](https://jailbreaking-llms.github.io/)
