@@ -1,0 +1,23 @@
+# --- Secrets: NEVER commit ---
+api-key.txt
+*.key
+.env
+
+# --- Local conda env (8 GB) and caches ---
+envs/
+.pipcache/
+.tmp/
+.hf/
+
+# --- Run artifacts ---
+.wandb/
+wandb/
+logs/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Large reference PDF (add back manually if you want it in the repo) ---
+PAIR.pdf

@@ -1,23 +1,21 @@
-from fastchat.model import (
-    get_conversation_template
-)
 import re
 from system_prompts import get_judge_system_prompt
 from language_models import APILiteLLM
 from loggers import logger
+from config import MODEL_NAMES
 
 from jailbreakbench import Classifier
 import os
 
 def load_judge(args):
-    if "gpt" in args.judge_model:
-        return GPTJudge(args)
-    elif args.judge_model == "no-judge":
+    if args.judge_model == "no-judge":
         return NoJudge(args)
     elif args.judge_model == "jailbreakbench":
         return JBBJudge(os.environ["TOGETHER_API_KEY"])
     elif args.judge_model == "gcg":
         return GCGJudge()
+    elif args.judge_model in MODEL_NAMES:
+        return GPTJudge(args)
     else:
         raise NotImplementedError
 
@@ -59,10 +57,10 @@ class GPTJudge(JudgeBase):
         self.judge_model = APILiteLLM(model_name = self.judge_name)
 
     def create_conv(self, full_prompt):
-        conv = get_conversation_template(self.judge_name)
-        conv.set_system_message(self.system_prompt)
-        conv.append_message(conv.roles[0], full_prompt)
-        return conv.to_openai_api_messages()
+        return [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": full_prompt},
+        ]
 
     def score(self, attack_prompt_list, target_response_list):
         convs_list = [self.create_conv(self.get_judge_prompt(prompt, response)) for prompt, response in zip(attack_prompt_list, target_response_list)]

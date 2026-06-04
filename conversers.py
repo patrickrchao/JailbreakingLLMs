@@ -1,3 +1,4 @@
+import json
 from common import get_api_key, conv_template, extract_json
 from language_models import APILiteLLM
 from config import FASTCHAT_TEMPLATE_NAMES, Model
@@ -16,7 +17,8 @@ def load_attack_and_target_models(args):
                         category = args.category,
                         max_n_tokens = args.target_max_n_tokens,
                         evaluate_locally = args.evaluate_locally,
-                        phase = args.jailbreakbench_phase
+                        phase = args.jailbreakbench_phase,
+                        use_jailbreakbench = args.use_jailbreakbench
                         )
     
     return attackLM, targetLM
@@ -120,8 +122,16 @@ class AttackLM():
             if not indices_to_regenerate:
                 break
 
-        if any([output is None for output in valid_outputs]):
-            raise ValueError(f"Failed to generate valid output after {self.max_n_attack_attempts} attempts. Terminating.")
+        # If a few streams still failed to produce valid JSON after all attempts,
+        # don't terminate the whole behavior (important for long unattended runs).
+        # Substitute a benign placeholder so PAIR keeps iterating on the other streams.
+        for i, output in enumerate(valid_outputs):
+            if output is None:
+                from loggers import logger
+                logger.warning(f"Stream {i}: no valid attack JSON after {self.max_n_attack_attempts} attempts; using placeholder.")
+                fallback = {"improvement": "", "prompt": "[attack generation failed for this stream]"}
+                valid_outputs[i] = fallback
+                new_adv_prompts[i] = json.dumps(fallback)
         return valid_outputs, new_adv_prompts
 
     def get_attack(self, convs_list, prompts_list):
@@ -186,14 +196,11 @@ class TargetLM():
                                 max_new_tokens=self.max_n_tokens)
             responses = llm_response.responses
         else:
-            batchsize = len(prompts_list)
-            convs_list = [conv_template(self.template) for _ in range(batchsize)]
-            full_prompts = []
-            for conv, prompt in zip(convs_list, prompts_list):
-                conv.append_message(conv.roles[0], prompt)
-                full_prompts.append(conv.to_openai_api_messages())
-
-            responses = self.model.batched_generate(full_prompts, 
+            convs_list = [
+                [{"role": "user", "content": prompt}]
+                for prompt in prompts_list
+            ]
+            responses = self.model.batched_generate(convs_list,
                                                             max_n_tokens = self.max_n_tokens,  
                                                             temperature = self.temperature,
                                                             top_p = self.top_p
