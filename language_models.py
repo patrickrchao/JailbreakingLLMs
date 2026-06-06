@@ -2,6 +2,7 @@ import os
 import litellm
 from config import (
     API_BASE_ENV_NAMES,
+    LITELLM_NAME_OVERRIDES,
     LITELLM_TEMPLATES,
     OPENAI_COMPATIBLE_MODEL_NAMES,
     TOGETHER_MODEL_NAMES,
@@ -36,6 +37,11 @@ class APILiteLLM(LanguageModel):
         self.set_eos_tokens(self.model_name)
         
     def get_litellm_model_name(self, model_name):
+        if model_name in LITELLM_NAME_OVERRIDES:
+            # Plain-chat models on Together/Google (paper-reproduction attacker /
+            # Gemini target): use the exact litellm name, no open-source seeding.
+            self.use_open_source_model = False
+            return LITELLM_NAME_OVERRIDES[model_name]
         if model_name in TOGETHER_MODEL_NAMES:
             litellm_name = TOGETHER_MODEL_NAMES[model_name]
             self.use_open_source_model = True
@@ -99,10 +105,13 @@ class APILiteLLM(LanguageModel):
         if self.api_base is not None:
             completion_kwargs["api_base"] = self.api_base
 
-        # Some gateway-hosted models (e.g. Claude via Vertex AI) reject requests
-        # that specify both `temperature` and `top_p` ("cannot both be specified
-        # for this model"). For those, send only `temperature`.
-        if "claude" not in self.litellm_model_name:
+        # Several gateway backends (Claude/Mistral/Nova via Vertex/Bedrock) reject
+        # requests that specify both `temperature` and `top_p` ("cannot both be
+        # specified for this model"). top_p is also a no-op at temperature 0
+        # (greedy decoding). So only send top_p when it actually matters — i.e.
+        # temperature > 0 on a backend that accepts both. This keeps the attacker
+        # (temp=1) diverse while making every temp=0 judge / target call robust.
+        if temperature and temperature > 0 and "claude" not in self.litellm_model_name:
             completion_kwargs["top_p"] = top_p
 
         outputs = litellm.batch_completion(

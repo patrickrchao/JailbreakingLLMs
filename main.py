@@ -131,7 +131,7 @@ if __name__ == '__main__':
         "--judge-model",
         default="gcg", #TODO changed
         help="Name of judge model. Defaults to the Llama Guard model from JailbreakBench.",
-        choices=MODEL_NAMES + ["no-judge", "jailbreakbench", "gcg"]
+        choices=MODEL_NAMES + ["no-judge", "jailbreakbench", "gcg", "llama-guard-4-12b"]
     )
     parser.add_argument(
         "--judge-max-n-tokens",

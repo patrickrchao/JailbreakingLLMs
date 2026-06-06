@@ -22,6 +22,26 @@ DEFAULT_TARGET_MODEL = "api-llama-4-scout"
 DEFAULT_JUDGE_MODEL = "claude-sonnet-4-6"
 FIRST_JAILBREAK_RE = re.compile(r"First Jailbreak: (\d+) Queries")
 
+# Special exit code meaning "the gateway API budget cap was hit". The sweep
+# driver watches for this to halt cleanly instead of churning through ghost runs.
+BUDGET_EXIT_CODE = 42
+JUDGE_FAIL_EXIT_CODE = 43
+# An isolated judge failure is usually content-specific (the judge safety-filters
+# an extreme-harm behavior and returns empty). Exclude that behavior and continue;
+# only halt if this many behaviors fail judging IN A ROW (real systemic breakage).
+JUDGE_FAIL_HALT_STREAK = 4
+BUDGET_MARKERS = ("Budget has been exceeded", "budget_exceeded")
+JUDGE_FAIL_MARKER = "Error in processing judge output"
+
+
+def log_has_budget_error(log_path: Path) -> bool:
+    text = log_path.read_text(errors="replace")
+    return any(marker in text for marker in BUDGET_MARKERS)
+
+
+def count_judge_failures(log_path: Path) -> int:
+    return log_path.read_text(errors="replace").count(JUDGE_FAIL_MARKER)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -59,13 +79,19 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--judge-model",
-        choices=MODEL_NAMES,
+        choices=MODEL_NAMES + ["jailbreakbench", "gcg", "no-judge", "llama-guard-4-12b"],
         default=DEFAULT_JUDGE_MODEL,
     )
     parser.add_argument("--n-streams", type=int, default=30)
     parser.add_argument("--n-iterations", type=int, default=3)
     parser.add_argument("--attack-max-n-tokens", type=int, default=500)
     parser.add_argument("--target-max-n-tokens", type=int, default=150)
+    parser.add_argument(
+        "--vv",
+        action="store_true",
+        help="Pass -vv (debug) to main.py so full per-iteration conversations are "
+             "logged (needed to reconstruct Figure-3 multi-turn transcripts).",
+    )
     parser.add_argument(
         "--api-key-file",
         type=Path,
@@ -297,6 +323,7 @@ def main() -> int:
     log_dir.mkdir(parents=True, exist_ok=True)
     completed_indices = load_completed_indices(status_path) if args.resume else set()
     main_py = Path(__file__).resolve().parent / "main.py"
+    judge_fail_streak = 0
 
     for index in range(args.start_index, stop_index):
         if index in completed_indices:
@@ -333,13 +360,27 @@ def main() -> int:
             behavior,
             "--index",
             str(index),
-            "-v",
+            "-vv" if args.vv else "-v",
         ]
 
         print(f"\nRUN {index}: {behavior}")
         started_at = utc_now()
         returncode = run_and_tee(command, env, log_path)
+        budget_hit = log_has_budget_error(log_path)
+        # Judge failure for THIS behavior: most/all judge calls errored, so its
+        # scores are garbage (every score silently defaults to 1).
+        n_judge_err = count_judge_failures(log_path)
+        judge_broken = (not budget_hit) and n_judge_err >= args.n_streams
         jailbroken, queries_to_jailbreak = parse_jailbreak_result(log_path)
+        if budget_hit or judge_broken:
+            # Tainted behavior: force non-zero returncode and drop its result so it
+            # is not counted as a clean completion.
+            returncode = returncode or 1
+            jailbroken, queries_to_jailbreak = None, None
+        if judge_broken:
+            judge_fail_streak += 1
+        elif not budget_hit:
+            judge_fail_streak = 0
         record = {
             "index": index,
             "behavior": behavior,
@@ -352,11 +393,39 @@ def main() -> int:
             "returncode": returncode,
             "jailbroken": jailbroken,
             "queries_to_jailbreak": queries_to_jailbreak,
+            "budget_exceeded": budget_hit,
+            "judge_failed": judge_broken,
             "started_at": started_at,
             "finished_at": utc_now(),
             "log_file": str(log_path),
         }
         append_status(status_path, record)
+
+        if budget_hit:
+            print(
+                f"BUDGET EXHAUSTED at index {index}: the gateway API budget cap was "
+                f"reached. Stopping now so no garbage results are recorded. After "
+                f"topping up the key, re-run with --resume to retry this behavior."
+            )
+            print_summary(status_path, selected_indices)
+            return BUDGET_EXIT_CODE
+
+        if judge_broken:
+            print(
+                f"JUDGE FAILURE at index {index}: {n_judge_err} judge errors "
+                f"(usually content-specific — the judge safety-filters an extreme "
+                f"behavior and returns empty). Excluded from results; continuing. "
+                f"Consecutive judge failures: {judge_fail_streak}."
+            )
+            if judge_fail_streak >= JUDGE_FAIL_HALT_STREAK:
+                print(
+                    f"{judge_fail_streak} judge failures in a row — the judge looks "
+                    f"systemically broken. Halting. Fix the judge, then re-run with "
+                    f"--resume."
+                )
+                print_summary(status_path, selected_indices)
+                return JUDGE_FAIL_EXIT_CODE
+            continue
 
         if returncode != 0:
             print(f"FAILED {index}: return code {returncode}")
