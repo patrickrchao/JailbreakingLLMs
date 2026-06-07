@@ -1,6 +1,13 @@
 import os 
 import litellm
-from config import TOGETHER_MODEL_NAMES, LITELLM_TEMPLATES, API_KEY_NAMES, Model
+from config import (
+    API_BASE_ENV_NAMES,
+    LITELLM_NAME_OVERRIDES,
+    LITELLM_TEMPLATES,
+    OPENAI_COMPATIBLE_MODEL_NAMES,
+    TOGETHER_MODEL_NAMES,
+    Model,
+)
 from loggers import logger
 from common import get_api_key
 
@@ -25,13 +32,22 @@ class APILiteLLM(LanguageModel):
         super().__init__(model_name)
         self.api_key = get_api_key(self.model_name)
         self.litellm_model_name = self.get_litellm_model_name(self.model_name)
+        self.api_base = self.get_api_base(self.model_name)
         litellm.drop_params=True
         self.set_eos_tokens(self.model_name)
         
     def get_litellm_model_name(self, model_name):
+        if model_name in LITELLM_NAME_OVERRIDES:
+            # Plain-chat models on Together/Google (paper-reproduction attacker /
+            # Gemini target): use the exact litellm name, no open-source seeding.
+            self.use_open_source_model = False
+            return LITELLM_NAME_OVERRIDES[model_name]
         if model_name in TOGETHER_MODEL_NAMES:
             litellm_name = TOGETHER_MODEL_NAMES[model_name]
             self.use_open_source_model = True
+        elif model_name in OPENAI_COMPATIBLE_MODEL_NAMES:
+            litellm_name = OPENAI_COMPATIBLE_MODEL_NAMES[model_name]
+            self.use_open_source_model = False
         else:
             self.use_open_source_model =  False
             #if self.use_open_source_model:
@@ -39,6 +55,18 @@ class APILiteLLM(LanguageModel):
                 #logger.warning(f"Warning: No TogetherAI model name for {model_name}.")
             litellm_name = model_name.value 
         return litellm_name
+
+    def get_api_base(self, model_name):
+        environment_variable = API_BASE_ENV_NAMES.get(model_name)
+        if environment_variable is None:
+            return None
+        try:
+            return os.environ[environment_variable]
+        except KeyError:
+            raise ValueError(
+                f"Missing API base URL for {model_name.value}. "
+                f"Please set {environment_variable}."
+            )
     
     def set_eos_tokens(self, model_name):
         if self.use_open_source_model:
@@ -66,26 +94,57 @@ class APILiteLLM(LanguageModel):
                          top_p: float,
                          extra_eos_tokens: list[str] = None) -> list[str]: 
         
-        eos_tokens = self.eos_tokens 
+        eos_tokens = list(self.eos_tokens)
 
         if extra_eos_tokens:
             eos_tokens.extend(extra_eos_tokens)
         if self.use_open_source_model:
             self._update_prompt_template()
         
+        completion_kwargs = {}
+        if self.api_base is not None:
+            completion_kwargs["api_base"] = self.api_base
+
+        # Several gateway backends (Claude/Mistral/Nova via Vertex/Bedrock) reject
+        # requests that specify both `temperature` and `top_p` ("cannot both be
+        # specified for this model"). top_p is also a no-op at temperature 0
+        # (greedy decoding). So only send top_p when it actually matters — i.e.
+        # temperature > 0 on a backend that accepts both. This keeps the attacker
+        # (temp=1) diverse while making every temp=0 judge / target call robust.
+        if temperature and temperature > 0 and "claude" not in self.litellm_model_name:
+            completion_kwargs["top_p"] = top_p
+
         outputs = litellm.batch_completion(
-            model=self.litellm_model_name, 
+            model=self.litellm_model_name,
             messages=convs_list,
             api_key=self.api_key,
             temperature=temperature,
-            top_p=top_p,
             max_tokens=max_n_tokens,
             num_retries=self.API_MAX_RETRY,
             seed=0,
             stop=eos_tokens,
+            **completion_kwargs,
         )
         
-        responses = [output["choices"][0]["message"].content for output in outputs]
+        responses = []
+        for output in outputs:
+            # litellm.batch_completion returns the raised exception object in-place
+            # for any request that failed all retries (e.g. a transient gateway 500
+            # on one stream). Don't let a single bad stream crash the whole behavior.
+            if isinstance(output, Exception):
+                logger.warning(f"API call failed for one stream: {output}")
+                responses.append(self.API_ERROR_OUTPUT)
+                continue
+            content = output["choices"][0]["message"].content
+            # Reasoning models (e.g. deepseek) can return content=None when the
+            # token budget is consumed by hidden reasoning. Coerce to an error
+            # string so downstream JSON parsing fails gracefully and retries,
+            # rather than crashing on a None concatenation.
+            if content is None:
+                logger.warning("API returned empty content for one stream.")
+                responses.append(self.API_ERROR_OUTPUT)
+            else:
+                responses.append(content)
 
         return responses
 
@@ -135,7 +194,6 @@ class APILiteLLM(LanguageModel):
 #             template.system_message = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.\n\nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
 #         return template
     
-
 
 
 

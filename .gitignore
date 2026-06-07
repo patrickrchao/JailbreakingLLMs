@@ -1,0 +1,44 @@
+# --- Secrets: NEVER commit ---
+api-key.txt
+api-key copy.txt
+google_key.txt
+togetherai.txt
+*key*.txt
+*.key
+.env
+
+# --- Paper / report (kept local, not pushed) ---
+paper/
+
+# --- Harvested result artifacts ---
+results_harvest/
+
+# --- Local conda env (8 GB) and caches ---
+envs/
+.pipcache/
+.tmp/
+.hf/
+
+# --- Run artifacts ---
+.wandb/
+wandb/
+logs/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Large reference PDF (add back manually if you want it in the repo) ---
+PAIR.pdf
+
+# --- Local plotting/analysis scripts (not pushed) ---
+plotting/
+
+# --- Local launchers with personal paths/keys (not pushed) ---
+run_jbc.sh
+run_paper_table2.sh
+run_target_sweep.sh
+run_transfer_paper.sh
+run_variant.sh
+*.sh

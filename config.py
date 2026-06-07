@@ -18,8 +18,28 @@ class Model(Enum):
     claude_2 = "claude-2.1"
     gemini = "gemini-pro"
     mixtral = "mixtral"
+    ucsd_mistral_small = "api-mistral-small-3.2-2506"
+    ucsd_mistral_large = "mistral.mistral-large-3-675b-instruct"
+    ucsd_deepseek = "api-deepseek-v4-flash"
+    ucsd_llama_4_scout = "api-llama-4-scout"
+    ucsd_claude_sonnet = "claude-sonnet-4-6"
+    ucsd_kimi = "moonshotai.kimi-k2.5"
+    ucsd_gpt_oss = "api-gpt-oss-120b"
+    ucsd_gemma = "api-gemma-4-26b"
+    # --- Paper Table 2 reproduction (multi-provider) ---
+    paper_qwen_attacker = "qwen-2.5-7b-instruct-turbo"   # attacker via Together
+    paper_gemini = "gemini-2.5-flash"                    # target via Google
+    paper_qwen_target = "qwen3-235b-instruct"            # target via Together (!= attacker)
 
 MODEL_NAMES = [model.value for model in Model]
+
+# Direct litellm model-name overrides (plain chat, no open-source seeding).
+# Used for the paper-reproduction attacker/target that live on Together / Google.
+LITELLM_NAME_OVERRIDES: dict = {
+    Model.paper_qwen_attacker: "together_ai/Qwen/Qwen2.5-7B-Instruct-Turbo",
+    Model.paper_gemini: "gemini/gemini-2.5-flash",
+    Model.paper_qwen_target: "together_ai/Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+}
 
 
 HF_MODEL_NAMES: dict[Model, str] = {
@@ -34,6 +54,28 @@ TOGETHER_MODEL_NAMES: dict[Model, str] = {
     Model.mixtral: "together_ai/mistralai/Mixtral-8x7B-Instruct-v0.1"
 }
 
+OPENAI_COMPATIBLE_MODEL_NAMES: dict[Model, str] = {
+    Model.ucsd_mistral_small: "openai/api-mistral-small-3.2-2506",
+    Model.ucsd_mistral_large: "openai/mistral.mistral-large-3-675b-instruct",
+    Model.ucsd_deepseek: "openai/api-deepseek-v4-flash",
+    Model.ucsd_llama_4_scout: "openai/api-llama-4-scout",
+    Model.ucsd_claude_sonnet: "openai/claude-sonnet-4-6",
+    Model.ucsd_kimi: "openai/moonshotai.kimi-k2.5",
+    Model.ucsd_gpt_oss: "openai/api-gpt-oss-120b",
+    Model.ucsd_gemma: "openai/api-gemma-4-26b",
+}
+
+API_BASE_ENV_NAMES: dict[Model, str] = {
+    Model.ucsd_mistral_small: "OPENAI_BASE_URL",
+    Model.ucsd_mistral_large: "OPENAI_BASE_URL",
+    Model.ucsd_deepseek: "OPENAI_BASE_URL",
+    Model.ucsd_llama_4_scout: "OPENAI_BASE_URL",
+    Model.ucsd_claude_sonnet: "OPENAI_BASE_URL",
+    Model.ucsd_kimi: "OPENAI_BASE_URL",
+    Model.ucsd_gpt_oss: "OPENAI_BASE_URL",
+    Model.ucsd_gemma: "OPENAI_BASE_URL",
+}
+
 FASTCHAT_TEMPLATE_NAMES: dict[Model, str] = {
     Model.gpt_3_5: "gpt-3.5-turbo",
     Model.gpt_4: "gpt-4",
@@ -43,6 +85,17 @@ FASTCHAT_TEMPLATE_NAMES: dict[Model, str] = {
     Model.vicuna: "vicuna_v1.1",
     Model.llama_2: "llama-2-7b-chat-hf",
     Model.mixtral: "mixtral",
+    Model.ucsd_mistral_small: "gpt-3.5-turbo",
+    Model.ucsd_mistral_large: "gpt-3.5-turbo",
+    Model.ucsd_deepseek: "gpt-3.5-turbo",
+    Model.ucsd_llama_4_scout: "gpt-3.5-turbo",
+    Model.ucsd_claude_sonnet: "gpt-3.5-turbo",
+    Model.ucsd_kimi: "gpt-3.5-turbo",
+    Model.ucsd_gpt_oss: "gpt-3.5-turbo",
+    Model.ucsd_gemma: "gpt-3.5-turbo",
+    Model.paper_qwen_attacker: "gpt-3.5-turbo",
+    Model.paper_gemini: "gpt-3.5-turbo",
+    Model.paper_qwen_target: "gpt-3.5-turbo",
 }
 
 API_KEY_NAMES: dict[Model, str] = {
@@ -54,6 +107,17 @@ API_KEY_NAMES: dict[Model, str] = {
     Model.vicuna:   "TOGETHER_API_KEY",
     Model.llama_2:  "TOGETHER_API_KEY",
     Model.mixtral:  "TOGETHER_API_KEY",
+    Model.ucsd_mistral_small: "OPENAI_API_KEY",
+    Model.ucsd_mistral_large: "OPENAI_API_KEY",
+    Model.ucsd_deepseek: "OPENAI_API_KEY",
+    Model.ucsd_llama_4_scout: "OPENAI_API_KEY",
+    Model.ucsd_claude_sonnet: "OPENAI_API_KEY",
+    Model.ucsd_kimi: "OPENAI_API_KEY",
+    Model.ucsd_gpt_oss: "OPENAI_API_KEY",
+    Model.ucsd_gemma: "OPENAI_API_KEY",
+    Model.paper_qwen_attacker: "TOGETHER_API_KEY",
+    Model.paper_gemini: "GEMINI_API_KEY",
+    Model.paper_qwen_target: "TOGETHER_API_KEY",
 }
 
 LITELLM_TEMPLATES: dict[Model, dict] = {
